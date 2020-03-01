@@ -9,13 +9,20 @@ const config = require('../config');
 // # Add alert endpoint
 router.post('/alert', async (req, res, next) => {
   // Reject request if app token doesn't match
-  console.log('req',req.body);
   if (req.body.appToken !== config.alertAppToken) {
-    return res.send({ message: 'Invalid Application Token!' });
+    return res.send({
+      message: 'Invalid Application Token!',
+      status: 'error'
+    });
   }
 
-  console.log('***fix-info: alert has been triggered');
-  res.send({ message: 'Alert has been triggered!' });
+  console.log('***fix-info: alert has been requested');
+  // App Token matches, check if alert already triggered
+
+  res.send({ 
+    message: 'Alert has been triggered!',
+    status: 'triggered'
+  });
 });
 
 // # Serve static client page for base routes

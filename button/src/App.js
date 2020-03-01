@@ -20,7 +20,7 @@ const clickHandler = () => {
   beep.play();
 
   // Send request to API
-  fetch('http://192.168.85.47:4000/alert', {
+  fetch('http://192.168.85.72:4000/alert', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -29,8 +29,20 @@ const clickHandler = () => {
     body: `appToken=${alertAppToken}`,
   })
   .then((res) => {
-    console.log(JSON.stringify(res.data));
-    alert(res.message);
+    return res.json();
+  })
+  .then((resdata) => {
+    console.log('resdata', resdata);
+    if (resdata.status === 'error') {
+      // Failed to trigger alert
+      return alert(`Error: ${resdata.message}`);
+    }
+
+    if (resdata.status === 'triggered') {
+      // Successfully triggered an alert
+      alert('SUCCESS');
+
+    }
   });
 }
 

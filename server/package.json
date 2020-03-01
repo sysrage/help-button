@@ -14,7 +14,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "build": "cd ../client && yarn && yarn build && cd ../server && yarn",
+    "build": "cd ../button && yarn && yarn build && cd ../server && yarn",
     "lint": "eslint \"**/*.js\" --ignore-pattern node_modules/"
   }
 }

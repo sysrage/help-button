@@ -28,7 +28,7 @@ export default class App extends React.Component {
     if (this.state.alertTriggered) return;
 
     // Send request to API
-    fetch('http://192.168.85.72:4000/alert', {
+    fetch('/alert', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

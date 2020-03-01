@@ -5,7 +5,7 @@ import beepSound from './sounds/beep.wav';
 
 // CSS
 import 'font-awesome/css/font-awesome.min.css';
-import './App.css';
+import './Button.css';
 
 // Set a super secret API key -- eventually obtained via login
 const alertAppToken = 'top_secret_alert_token';
@@ -14,7 +14,7 @@ const alertAppToken = 'top_secret_alert_token';
 const beep = new Audio(beepSound);
 beep.load();
 
-export default class App extends React.Component {
+export default class Button extends React.Component {
   state = {
     alertTriggered: false,
   };
@@ -53,10 +53,11 @@ export default class App extends React.Component {
     });
   }
 
+
   render = () => {
     return (
-      <div className="App">
-        <header className="App-header">
+      <div className="Button">
+        <header className="Button-header">
           <span className={this.state.alertTriggered ? 'pulse' : 'pulseDisabled'}>
             <a href="#" className="btn" onClick={this.clickHandler}>
               <i className="fa fa-bell"></i>

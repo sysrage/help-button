@@ -1,8 +1,8 @@
-.App {
+.Button {
   text-align: center;
 }
 
-.App-header {
+.Button-header {
   background: -webkit-linear-gradient(360deg,#383836 10%,#4a4a4a 360%); background: linear-gradient(360deg,#383836 10%,#4a4a4a 360%);
   min-height: 100vh;
   display: flex;
@@ -32,7 +32,7 @@
   width: 180px;
   height: 180px;
   line-height: 180px;
-  vertical-align: middle; 
+  vertical-align: middle;
   left: 10px;
   top: 9px;
   border-radius: 50%;

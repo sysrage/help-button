@@ -1,21 +1,37 @@
 import React from 'react';
 
-import UIfx from 'uifx';
-import mp3File from './beep.mp3';
+// Sounds
+import mp3Beep from './sounds/beep.mp3';
 
+// CSS
 import 'font-awesome/css/font-awesome.min.css';
 import './App.css';
 
-const beep = new UIfx(
-  mp3File,
-  {
-    volume: 1,
-    throttleMs: 100,
-  }
-);
+// Preload beep sound
+const beep = new Audio(mp3Beep);
+beep.load();
 
+// Set a super secret API key -- eventually obtained via login
+const alertAppToken = 'top_secret_alert_token';
+
+// Event handler for button click
 const clickHandler = () => {
+  // Play sound and trigger state change for animations
   beep.play();
+
+  // Send request to API
+  fetch('http://192.168.85.47:4000/alert', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json',
+    },
+    body: `appToken=${alertAppToken}`,
+  })
+  .then((res) => {
+    console.log(JSON.stringify(res.data));
+    alert(res.message);
+  });
 }
 
 const App = () => {

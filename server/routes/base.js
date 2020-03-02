@@ -51,6 +51,7 @@ const triggerAlert = () => {
   }, 10 * 1000);
 
   // Reset alert state if not acknowledged in 60 minutes
+  clearInterval(ackTimer);
   ackTimer = setTimeout(() => {
     clearAlert();
   }, 60 * 60 * 1000);
@@ -68,6 +69,11 @@ const clearAlert = () => {
   clearInterval(pushTimer);
   clearTimeout(ackTimer);
 }
+
+// # Add status endpoint
+router.get('/status', (req, res, next) => {
+  res.send(JSON.stringify(alertState));
+});
 
 // # Add alert endpoint
 router.post('/alert', (req, res, next) => {

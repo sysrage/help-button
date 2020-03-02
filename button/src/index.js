@@ -6,7 +6,6 @@ import './index.css';
 import Button from './Button';
 import * as serviceWorker from './serviceWorker';
 
-// ReactDOM.render(<Button />, document.getElementById('root'));
 ReactDOM.render(
   <BrowserRouter>
     <Route component={Button} path='/' />

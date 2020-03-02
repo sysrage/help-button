@@ -64,7 +64,7 @@ export default class Button extends React.Component {
     });
   }
 
-  adminPanel = this.props.location.pathname === '/admin' ? true : false;
+  adminPanel = this.props.location.pathname.substring(0,6) === '/admin' ? true : false;
 
   // Event handler for button click
   clickHandler = () => {
@@ -113,8 +113,8 @@ export default class Button extends React.Component {
     }, 1000);
   }
 
+
   render = () => {
-    console.log('this.state.lastAlert',this.state.lastAlert);
     const dateFormat = {
       weekday: 'long',
       month: 'long',

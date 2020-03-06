@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Sounds
 import beepSound from './sounds/beep.wav';
@@ -14,40 +14,12 @@ const alertAppToken = 'top_secret_alert_token';
 const beep = new Audio(beepSound);
 beep.load();
 
-export default class Button extends React.Component {
-  state = {
-    alertTriggered: false,
-    alertAcknowledged: false,
-    lastAlert: null,
-  };
+const Button = (props) => {
+  // Admin panel items will be shown if URL path is /admin
+  const adminPanel = props.location.pathname.substring(0,6) === '/admin' ? true : false;
 
-  // Poll API for current alert status
-  alertStatusInterval = null;
-  getAlertStatus = () => {
-    fetch('/status', {
-      method: 'GET',
-    })
-    .then((res) => {
-      return res.json();
-    })
-    .then((resdata) => {
-      if (resdata.lastTrigger && resdata.lastTrigger !== this.state.lastAlert) {
-        this.setState({lastAlert: resdata.lastTrigger});
-      }
-
-      if (resdata.status === 'ready' && (this.state.alertTriggered || this.state.alertAcknowledged)) {
-        this.setState({ alertTriggered: false, alertAcknowledged: false });
-      }
-      if (resdata.status === 'triggered' && (!this.state.alertTriggered || this.state.alertAcknowledged)) {
-        this.setState({ alertTriggered: true, alertAcknowledged: false });
-      }
-      if (resdata.status === 'acknowledged' && (!this.state.alertTriggered || !this.state.alertAcknowledged)) {
-        this.setState({ alertTriggered: true, alertAcknowledged: true });
-      }
-    });
-  }
-
-  acknowledgeAlert = () => {
+  // acknowledgeAlert() -- Function to allow admins to acknowledge an alert
+  const acknowledgeAlert = () => {
     fetch('/admin', {
       method: 'POST',
       headers: {
@@ -64,20 +36,18 @@ export default class Button extends React.Component {
     });
   }
 
-  adminPanel = this.props.location.pathname.substring(0,6) === '/admin' ? true : false;
-
-  // Event handler for button click
-  clickHandler = () => {
+  // buttonClickHandler(event) -- Event handler for button click
+  const buttonClickHandler = () => {
     // Play sound and trigger state change for animations
     beep.play();
 
-    if (this.state.alertTriggered) {
+    if (alertTriggered) {
       // Don't re-send request if already triggered and hasn't been acknowledged
-      if (!this.adminPanel && !this.state.alertAcknowledged) return;
+      if (!adminPanel && !alertAcknowledged) return;
 
       // If admin panel, acknowledge alert
-      if (this.adminPanel && !this.state.alertAcknowledged) {
-        return this.acknowledgeAlert();
+      if (adminPanel && !alertAcknowledged) {
+        return acknowledgeAlert();
       }
     }
 
@@ -98,46 +68,85 @@ export default class Button extends React.Component {
         // Failed to trigger alert
         return alert(`Error: ${resdata.message}`);
       }
-
-      if (resdata.status === 'triggered') {
-        // Successfully triggered an alert
-        this.setState({ alertTriggered: true });
-      }
     });
   }
+  
 
-  componentDidMount = () => {
-    this.getAlertStatus();
-    this.alertStatusInterval = setInterval(() => {
-      this.getAlertStatus();
+  // State for current API status 
+  const [ apiStatus, setApiStatus ] = useState('ready');
+  const [ lastAlert, setLastAlert ] = useState(null);
+
+  // Start API status check interval when component mounts
+  useEffect(() => {
+    // Function to poll API for current alert status
+    const getAlertStatus = async () => {
+      const response = await fetch('/status', { method: 'GET' });
+      const resdata = await response.json();
+      if (resdata.status) {
+        setApiStatus(resdata.status);
+      }
+      if (resdata.lastTrigger) {
+        setLastAlert(resdata.lastTrigger);
+      }
+    }
+
+    // Check alert status every second
+    const alertStatusInterval = setInterval(() => {
+      getAlertStatus();
     }, 1000);
-  }
+
+    // Clear interval when unmounted
+    return () => clearInterval(alertStatusInterval);
+  }, []);
 
 
-  render = () => {
+  // State for current UI status
+  const [ alertTriggered, setAlertTriggered ] = useState(false);
+  const [ alertAcknowledged, setAlertAcknowledged ] = useState(false);
+  const [ lastAlertDate, setLastAlertDate ] = useState('Unknown');
+
+  // Update button state when API status has changed
+  useEffect(() => {
+    if (apiStatus === 'ready') {
+      setAlertTriggered(false);
+      setAlertAcknowledged(false);
+    }
+    if (apiStatus === 'triggered') {
+      setAlertTriggered(true);
+      setAlertAcknowledged(false);
+    }
+    if (apiStatus === 'acknowledged') {
+      setAlertTriggered(true);
+      setAlertAcknowledged(true);
+    }
+  }, [ apiStatus ]);
+
+  useEffect(() => {
     const dateFormat = {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
     };
-    const lastAlertDate = this.state.lastAlert ? new Date(this.state.lastAlert).toLocaleTimeString('en-US', dateFormat) : 'Unknown';
-    const alertPulseStatus = this.state.alertTriggered ? this.state.alertAcknowledged ? 'pulse pgreen' : 'pulse pred' : 'pulse';
-    const alertButtonStatus = this.state.alertTriggered ? this.state.alertAcknowledged ? 'btn green' : 'btn red' : 'btn';
-    const alertButtonIcon = this.state.alertAcknowledged ? 'fa fa-thumbs-up' : 'fa fa-bell';
-    return (
-      <div className="Button">
-        <header className="Button-header">
-          <span className={alertPulseStatus}>
-            <a href="#" className={alertButtonStatus} onClick={this.clickHandler}>
-              <i className={alertButtonIcon}></i>
-            </a>
-          </span>
-          { !this.adminPanel ? null
-            : <span className='lastAlertText'><b>Last Alert</b><br />{lastAlertDate}</span>
-          }
-        </header>
-      </div>
-    );
-  };
+    setLastAlertDate(new Date(lastAlert).toLocaleTimeString('en-US', dateFormat));
+  }, [ lastAlert ]);
+
+  
+  // Return UI
+  return (
+    <div className="Button">
+      <header className="Button-header">
+        <span className={ alertTriggered ? alertAcknowledged ? 'pulse pgreen' : 'pulse pred' : 'pulse' }>
+          <a href="#" className={ alertTriggered ? alertAcknowledged ? 'btn green' : 'btn red' : 'btn' } onClick={ buttonClickHandler }>
+            <i className={ alertAcknowledged ? 'fa fa-thumbs-up' : 'fa fa-bell' }></i>
+          </a>
+        </span>
+        { !adminPanel ? null
+          : <span className='lastAlertText'><b>Last Alert</b><br />{ lastAlertDate }</span>
+        }
+      </header>
+    </div>
+  );
 
 };
+
+export default Button;

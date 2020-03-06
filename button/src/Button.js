@@ -141,7 +141,7 @@ const Button = (props) => {
           </a>
         </span>
         { !adminPanel ? null
-          : <span className='lastAlertText'><b>Last Alert</b><br />{ lastAlertDate }</span>
+          : <span className='lastAlertText'><b>Last Alert</b><br />{ lastAlert ? lastAlertDate : 'None' }</span>
         }
       </header>
     </div>

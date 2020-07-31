@@ -22,7 +22,7 @@ const sendPush = () => {
   const pushMessage = {
     message: 'The help button has been pressed.',
     title: 'Help Needed!',
-    sound: 'siren',
+    sound: 'gamelan',
     priority: 1,
   };
 

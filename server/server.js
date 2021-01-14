@@ -114,9 +114,9 @@ const shutDown = () => {
   server.close(() => {
     // logger.info('Server has been stopped.');
     console.log('***fix-info: Server has been stopped.');
-    db.close(() => {
+//    db.close(() => {
       process.exit(0);
-    });
+//    });
   });
 };
 process.on('SIGINT', shutDown);

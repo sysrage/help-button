@@ -70,9 +70,9 @@ const Button = (props) => {
       }
     });
   }
-  
 
-  // State for current API status 
+
+  // State for current API status
   const [ apiStatus, setApiStatus ] = useState('ready');
   const [ lastAlert, setLastAlert ] = useState(null);
 
@@ -130,15 +130,15 @@ const Button = (props) => {
     setLastAlertDate(new Date(lastAlert).toLocaleTimeString('en-US', dateFormat));
   }, [ lastAlert ]);
 
-  
+
   // Return UI
   return (
     <div className="Button">
       <header className="Button-header">
         <span className={ alertTriggered ? alertAcknowledged ? 'pulse pgreen' : 'pulse pred' : 'pulse' }>
-          <a href="#" className={ alertTriggered ? alertAcknowledged ? 'btn green' : 'btn red' : 'btn' } onClick={ buttonClickHandler }>
+          <i className={ alertTriggered ? alertAcknowledged ? 'btn green' : 'btn red' : 'btn' } onClick={ buttonClickHandler }>
             <i className={ alertAcknowledged ? 'fa fa-thumbs-up' : 'fa fa-bell' }></i>
-          </a>
+          </i>
         </span>
         { !adminPanel ? null
           : <span className='lastAlertText'><b>Last Alert</b><br />{ lastAlert ? lastAlertDate : 'None' }</span>

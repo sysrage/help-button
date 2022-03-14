@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useHistory } from 'react-router-dom';
 
 // Sounds
 import beepSound from './sounds/beep.wav';
@@ -7,37 +8,32 @@ import beepSound from './sounds/beep.wav';
 import 'font-awesome/css/font-awesome.min.css';
 import './Button.css';
 
-// Set a super secret API key -- eventually obtained via login
-const alertAppToken = 'top_secret_alert_token';
-
 // Preload beep sound
 const beep = new Audio(beepSound);
 beep.load();
 
 const Button = (props) => {
   // Admin panel items will be shown if URL path is /admin
-  const adminPanel = props.location.pathname.substring(0,6) === '/admin' ? true : false;
+  const adminPanel = props.location.pathname.startsWith('/admin');
 
-  // acknowledgeAlert() -- Function to allow admins to acknowledge an alert
-  const acknowledgeAlert = () => {
-    fetch('/admin', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-      },
-      body: `appToken=${alertAppToken}&command=acknowledge`,
-    })
-    .then((res) => {
-      return res.json();
-    })
-    .then((resdata) => {
-      console.log('resdata',resdata);
-    });
+  // Enable /logout path
+  const history = useHistory();
+  if (props.location.pathname.startsWith('/logout')) {
+    localStorage.removeItem('buttonAppToken');
+    history.push('/');
   }
 
+  // State objects
+  const [ password, setPassword ] = useState('');
+  const [ appToken, setAppToken ] = useState(localStorage.getItem('buttonAppToken'));
+  const [ apiStatus, setApiStatus ] = useState('ready');
+  const [ lastAlert, setLastAlert ] = useState(null);
+  const [ alertTriggered, setAlertTriggered ] = useState(false);
+  const [ alertAcknowledged, setAlertAcknowledged ] = useState(false);
+  const [ lastAlertDate, setLastAlertDate ] = useState('Unknown');
+
   // buttonClickHandler(event) -- Event handler for button click
-  const buttonClickHandler = () => {
+  const buttonClickHandler = async () => {
     // Play sound and trigger state change for animations
     beep.play();
 
@@ -47,46 +43,58 @@ const Button = (props) => {
 
       // If admin panel, acknowledge alert
       if (adminPanel && !alertAcknowledged) {
-        return acknowledgeAlert();
+        return await acknowledgeAlert();
       }
     }
 
     // Send request to API
-    fetch('/alert', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-      },
-      body: `appToken=${alertAppToken}`,
-    })
-    .then((res) => {
-      return res.json();
-    })
-    .then((resdata) => {
-      if (resdata.status === 'error') {
+    try {
+      const res = await fetch('/alert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+        },
+        body: `appToken=${appToken}`,
+      });
+      if (res.status === 'error') {
         // Failed to trigger alert
-        return alert(`Error: ${resdata.message}`);
+        return alert(`Error: ${res.message}`);
       }
-    });
-  }
+      console.log(await res.json());
+    } catch (error) {
+      return alert(`Error: ${error}`);
+    }
+  };
 
+  // acknowledgeAlert() -- Function to allow admins to acknowledge an alert
+  const acknowledgeAlert = async () => {
+    try {
+      const res = await fetch('/admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+        },
+        body: `appToken=${appToken}&command=acknowledge`,
+      });
+      console.log('Response:', res);
+    } catch (error) {
+      console.error(`Error: ${error}`);
+    }
+  };
 
-  // State for current API status
-  const [ apiStatus, setApiStatus ] = useState('ready');
-  const [ lastAlert, setLastAlert ] = useState(null);
-
-  // Start API status check interval when component mounts
+  // Start API status check interval when appToken is set
   useEffect(() => {
     // Function to poll API for current alert status
     const getAlertStatus = async () => {
       const response = await fetch('/status', { method: 'GET' });
-      const resdata = await response.json();
-      if (resdata.status) {
-        setApiStatus(resdata.status);
+      const data = await response.json();
+      if (data.status) {
+        setApiStatus(data.status);
       }
-      if (resdata.lastTrigger) {
-        setLastAlert(resdata.lastTrigger);
+      if (data.lastTrigger) {
+        setLastAlert(data.lastTrigger);
       }
     }
 
@@ -97,13 +105,8 @@ const Button = (props) => {
 
     // Clear interval when unmounted
     return () => clearInterval(alertStatusInterval);
-  }, []);
+  }, [appToken]);
 
-
-  // State for current UI status
-  const [ alertTriggered, setAlertTriggered ] = useState(false);
-  const [ alertAcknowledged, setAlertAcknowledged ] = useState(false);
-  const [ lastAlertDate, setLastAlertDate ] = useState('Unknown');
 
   // Update button state when API status has changed
   useEffect(() => {
@@ -130,20 +133,54 @@ const Button = (props) => {
     setLastAlertDate(new Date(lastAlert).toLocaleTimeString('en-US', dateFormat));
   }, [ lastAlert ]);
 
+  const handlePasswordChange = (event) => {
+    setPassword(event.target.value);
+  };
+
+  const handlePasswordSubmit = async (event) => {
+    event.preventDefault();
+    try {
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+        },
+        body: `password=${password}`,
+      });
+      console.log('res.status', res.status);
+      if (res.status === 401) {
+        return alert('Invalid Password');
+      }
+      localStorage.setItem('buttonAppToken', password);
+      setAppToken(password);
+    } catch (error) {
+      alert(`Error: ${error}`);
+    }
+  };
 
   // Return UI
   return (
     <div className="Button">
-      <header className="Button-header">
-        <span className={ alertTriggered ? alertAcknowledged ? 'pulse pgreen' : 'pulse pred' : 'pulse' }>
-          <i className={ alertTriggered ? alertAcknowledged ? 'btn green' : 'btn red' : 'btn' } onClick={ buttonClickHandler }>
-            <i className={ alertAcknowledged ? 'fa fa-thumbs-up' : 'fa fa-bell' }></i>
-          </i>
-        </span>
-        { !adminPanel ? null
-          : <span className='lastAlertText'><b>Last Alert</b><br />{ lastAlert ? lastAlertDate : 'None' }</span>
-        }
-      </header>
+      { !appToken ? (
+        <div className="Login">
+          <span>Enter Password</span>
+          <form id="loginform" onSubmit={handlePasswordSubmit}>
+            <input id="password" value={password} onChange={handlePasswordChange} />
+          </form>
+        </div>
+      ) : (
+        <header className="Button-header">
+          <span className={ alertTriggered ? alertAcknowledged ? 'pulse pgreen' : 'pulse pred' : 'pulse' }>
+            <i className={ alertTriggered ? alertAcknowledged ? 'btn green' : 'btn red' : 'btn' } onClick={ buttonClickHandler }>
+              <i className={ alertAcknowledged ? 'fa fa-thumbs-up' : 'fa fa-bell' }></i>
+            </i>
+          </span>
+          { !adminPanel ? null
+            : <span className='lastAlertText'><b>Last Alert</b><br />{ lastAlert ? lastAlertDate : 'None' }</span>
+          }
+        </header>
+      )}
     </div>
   );
 

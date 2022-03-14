@@ -1,17 +1,20 @@
-const express = require('express');
 const path = require('path');
+
+const chalk = require('chalk');
+const express = require('express');
 const Push = require('pushover-notifications');
 
 const router = express.Router();
 const config = require('../config');
 
 // State objects
-let pushTimer = null;
-let ackTimer = null;
+let pushInterval = null;
+let ackTimeout = null;
+let resetTimeout;
 const alertState = {
   status: 'ready',
   lastTrigger: null,
-}
+};
 
 const sendPush = () => {
   // Send Pushover notifications
@@ -30,63 +33,98 @@ const sendPush = () => {
   for (let i = 0; i < config.pushoverTargets.length; i++) {
     push.send({...pushMessage, user: config.pushoverTargets[i]}, (err, res) => {
       if (err) {
-        console.log('***fix-error: Error sending Pushover alert.');
-        console.log(err);
+        console.error(`${chalk.red('[Error]')} Error sending Pushover alert:\n${err}`);
       } else {
-        console.log('***fix-info: Successfully sent Pushover alert.')
-        console.log(res);
+        console.log(`${chalk.green('[Info]')} Successfully sent Pushover alert:\n${res}`);
       }
     });
   }
-}
+};
 
 const triggerAlert = () => {
   alertState.status = 'triggered';
   alertState.lastTrigger = new Date();
   sendPush();
 
+  // Clear any existing timeouts
+  if (resetTimeout) clearTimeout(resetTimeout);
+  if (pushInterval) clearInterval(pushInterval);
+  if (ackTimeout) clearTimeout(ackTimeout);
+
   // Re-send Pushover notice every 10 seconds
-  pushTimer = setInterval(() => {
+  pushInterval = setInterval(() => {
     sendPush();
   }, 10 * 1000);
 
   // Reset alert state if not acknowledged in 60 minutes
-  clearInterval(ackTimer);
-  ackTimer = setTimeout(() => {
+  ackTimeout = setTimeout(() => {
+    console.log(`${chalk.green('[Info]')} Resetting alert state...`);
     clearAlert();
+    console.log(`${chalk.green('[Info]')} New Alert State: ${JSON.stringify(alertState)}`);
   }, 60 * 60 * 1000);
-
-}
+};
 
 const ackAlert = () => {
   alertState.status = 'acknowledged';
-  clearInterval(pushTimer);
-  clearInterval(ackTimer);
-}
+
+  // Clear any existing timeouts
+  if (pushInterval) clearInterval(pushInterval);
+  if (resetTimeout) clearTimeout(resetTimeout);
+  if (ackTimeout) clearTimeout(ackTimeout);
+
+  resetTimeout = setTimeout(() => {
+    // Reset alert state after 2 minutes
+    console.log(`${chalk.green('[Info]')} Resetting alert state...`);
+    clearAlert();
+    console.log(`${chalk.green('[Info]')} New Alert State: ${JSON.stringify(alertState)}`);
+  }, 2 * 60 * 1000);
+};
 
 const clearAlert = () => {
   alertState.status = 'ready';
-  clearInterval(pushTimer);
-  clearTimeout(ackTimer);
-}
+  clearInterval(pushInterval);
+  clearTimeout(ackTimeout);
+};
+
+// Cleanup when server is stopped
+process.on('SIGINT', () => {
+  console.log(`${chalk.green('[Info]')} Clearing all timeouts...`);
+  if (pushInterval) clearInterval(pushInterval);
+  if (resetTimeout) clearTimeout(resetTimeout);
+  if (ackTimeout) clearTimeout(ackTimeout);
+});
 
 // # Add status endpoint
 router.get('/status', (req, res, next) => {
   res.send(JSON.stringify(alertState));
 });
 
+// # Add login endpoint
+router.post('/login', (req, res, next) => {
+  // Reject the request if token doesn't match
+  if (req.body.password !== config.alertAppToken) {
+    res.status(401);
+    return res.send({
+      message: 'Invalid Application Token!',
+      status: 'error'
+    });
+  }
+  res.send({ message: 'Success', status: 'success' });
+});
+
 // # Add alert endpoint
 router.post('/alert', (req, res, next) => {
-  console.log('alertState', alertState);
   // Reject request if app token doesn't match
   if (req.body.appToken !== config.alertAppToken) {
+    res.status(401);
     return res.send({
       message: 'Invalid Application Token!',
       status: 'error',
     });
   }
 
-  console.log('***fix-info: alert has been requested');
+  console.log(`${chalk.green('[Info]')} Current Alert State: ${JSON.stringify(alertState)}`);
+  console.log(`${chalk.green('[Info]')} Alert state change has been requested...`);
   // App Token matches, check if alert already triggered
   if (alertState.status === 'triggered') {
     return res.send({
@@ -96,9 +134,8 @@ router.post('/alert', (req, res, next) => {
   }
 
   // Trigger an alert
-  console.log('***fix-info: alert has been triggered');
   triggerAlert();
-  console.log('alertState', alertState);
+  console.log(`${chalk.green('[Info]')} New Alert State: ${JSON.stringify(alertState)}`);
 
   res.send({
     message: 'Alert has been triggered!',
@@ -108,17 +145,18 @@ router.post('/alert', (req, res, next) => {
 
 // # Add admin endpoint
 router.post('/admin', (req, res, next) => {
-  console.log('alertState', alertState);
   // Reject request if app token doesn't match
   if (req.body.appToken !== config.alertAppToken) {
+    res.status(401);
     return res.send({
       message: 'Invalid Application Token!',
       status: 'error',
     });
   }
 
+  console.log(`${chalk.green('[Info]')} Current Alert State: ${JSON.stringify(alertState)}`);
   if (req.body.command === 'acknowledge') {
-    console.log('***fix-info: acknowledgement has been requested');
+    console.log(`${chalk.green('[Info]')} Alert acknowledgement has been requested...`);
     // App Token matches, check if alert not triggered or already acknowledged
     if (alertState.status === 'ready' || alertState.status === 'acknowledged') {
       return res.send({
@@ -128,16 +166,8 @@ router.post('/admin', (req, res, next) => {
     }
 
     // Acknowledge the alert
-    console.log('***fix-info: alert has been triggered');
     ackAlert();
-    console.log('alertState', alertState);
-
-    setTimeout(() => {
-      // Reset alert state after 2 minutes
-      console.log('***fix-info: alert has been cleared');
-      clearAlert();
-      console.log('alertState', alertState);
-    }, 2 * 60 * 1000);
+    console.log(`${chalk.green('[Info]')} New Alert State: ${JSON.stringify(alertState)}`);
 
     return res.send({
       message: 'Alert has been acknowledged.',

@@ -2,6 +2,24 @@
   text-align: center;
 }
 
+.Login {
+  width: 250px;
+  margin-top: 10px;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 18px;
+  color: #fff;
+  padding: 50px;
+  border: 1px solid #8b8b8b;
+  border-radius: 10px;
+}
+
+.Login > form > input {
+  margin-top: 10px;
+  border-radius: 5px;
+  font-size: 18px;
+}
+
 .Button-header {
   background: -webkit-linear-gradient(360deg,#383836 10%,#4a4a4a 360%); background: linear-gradient(360deg,#383836 10%,#4a4a4a 360%);
   min-height: 100vh;

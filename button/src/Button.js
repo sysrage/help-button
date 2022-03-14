@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useHistory } from 'react-router-dom';
 
 // Sounds
 import beepSound from './sounds/beep.wav';
@@ -14,6 +15,13 @@ beep.load();
 const Button = (props) => {
   // Admin panel items will be shown if URL path is /admin
   const adminPanel = props.location.pathname.startsWith('/admin');
+
+  // Enable /logout path
+  const history = useHistory();
+  if (props.location.pathname.startsWith('/logout')) {
+    localStorage.removeItem('buttonAppToken');
+    history.push('/');
+  }
 
   // State objects
   const [ password, setPassword ] = useState('');

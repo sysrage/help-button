@@ -183,6 +183,6 @@ router.post('/admin', (req, res, next) => {
 });
 
 // # Serve static client page for base routes
-router.use(['/admin', '/'], express.static(path.join(__dirname, '../../button/build/')));
+router.use(['/admin','/logout', '/'], express.static(path.join(__dirname, '../../button/build/')));
 
 module.exports = router;

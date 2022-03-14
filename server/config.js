@@ -1,5 +1,4 @@
 const path = require('path');
-require('dotenv').config();
 
 // # Server Configuration
 module.exports = {

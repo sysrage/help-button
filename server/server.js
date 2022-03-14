@@ -3,6 +3,9 @@ const chalk = require('chalk');
 const express = require('express');
 const stoppable = require('stoppable');
 
+// Read environment variables from .env
+require('dotenv').config();
+
 const config = require('./config');
 const debugEnabled = ['-debug', '--debug'].some(d => process.argv.includes(d));
 

@@ -37,6 +37,21 @@
   font-size: 24px;
 }
 
+.connectionsText {
+  padding-top: 16px;
+  text-shadow: 1px 3px 4px #000;
+  font-size: 18px;
+}
+
+.connectingView {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
 .red {
   color: rgba(114, 2, 2, 0.678) !important;
 }

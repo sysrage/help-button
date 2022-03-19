@@ -1,8 +1,10 @@
-const path = require('path');
+'use strict';
 
 // # Server Configuration
 module.exports = {
   port: process.env.PORT || 4000,
+
+  wsPort: process.env.WSPORT || 4080,
 
   pushoverAppToken: process.env.PO_APP_TOKEN || '',
 

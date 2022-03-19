@@ -1,3 +1,5 @@
+'use strict';
+
 // ## Help Button -- Web / API Server
 const path = require('path');
 const chalk = require('chalk');
@@ -8,23 +10,23 @@ const stoppable = require('stoppable');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const config = require('./config');
-const debugEnabled = ['-debug', '--debug'].some(d => process.argv.includes(d));
 
-console.log(`${chalk.cyan('Starting Help Button API Server...')}\n`
-+ '  _   _      _        ______       _   _               \n'
-+ ' | | | |    | |       | ___ \\     | | | |             \n'
-+ ' | |_| | ___| |_ __   | |_/ /_   _| |_| |_ ___  _ __  \n'
-+ ' |  _  |/ _ \\ | \'_ \\  | ___ \\ | | | __| __/ _ \\| \'_ \\ \n'
-+ ' | | | |  __/ | |_) | | |_/ / |_| | |_| || (_) | | | |\n'
-+ ' \\_| |_/\\___|_| .__/  \\____/ \\__,_|\\__|\\__\\___/|_| |_|\n'
-+ '              | |                                     \n'
-+ '              |_|                                     \n'
-);
+const debugEnabled = [ '-debug', '--debug' ].some((d) => process.argv.includes(d));
 
+console.log(`${chalk.cyan('Starting Help Button API Server...')}\n` +
+'  _   _      _        ______       _   _               \n' +
+ ' | | | |    | |       | ___ \\     | | | |             \n' +
+ ' | |_| | ___| |_ __   | |_/ /_   _| |_| |_ ___  _ __  \n' +
+ ' |  _  |/ _ \\ | \'_ \\  | ___ \\ | | | __| __/ _ \\| \'_ \\ \n' +
+ ' | | | |  __/ | |_) | | |_/ / |_| | |_| || (_) | | | |\n' +
+ ' \\_| |_/\\___|_| .__/  \\____/ \\__,_|\\__|\\__\\___/|_| |_|\n' +
+ '              | |                                     \n' +
+ '              |_|                                     \n');
 
-// # Express (Web Server) Setup
+// # Web Server (express) Setup
 if (debugEnabled) console.log(`${chalk.yellow('[Debug]')} Creating express server object...`);
 const app = express();
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -45,10 +47,9 @@ const baseRoutes = require('./routes/base');
 app.use('/', baseRoutes);
 
 // Express error handling
-app.use((err, req, res, next) => {
+app.use((err) => {
   if (err) {
-    console.error(`${chalk.red('[Error]')} Express error encountered:\n${err.stack}`);
-    res.status(500).send('Something broke!');
+    console.error(`${chalk.red('[Error]')} Express error encountered:\n${JSON.stringify(err, null, 2)}`);
   }
 });
 
@@ -56,16 +57,16 @@ const server = stoppable(app.listen(config.port, () => {
   console.log(`${chalk.green('[Info]')} Server listening on port: ${config.port}`);
 }));
 
-
 // # Function to gracefully shutdown
 const shutDown = () => {
   console.log(`${chalk.green('[Info]')} Shutting down server...`);
   server.stop();
   server.close(() => {
     console.log(`${chalk.green('[Info]')} Server has been stopped.`);
-      process.exit(0);
+    process.exit(0);
   });
 };
+
 process.on('SIGINT', shutDown);
 process.on('SIGTERM', shutDown);
 

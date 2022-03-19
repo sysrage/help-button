@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 
 // Sounds
@@ -26,87 +26,161 @@ const Button = (props) => {
   // State objects
   const [ password, setPassword ] = useState('');
   const [ appToken, setAppToken ] = useState(localStorage.getItem('buttonAppToken'));
-  const [ apiStatus, setApiStatus ] = useState('ready');
+  const [ apiStatus, setApiStatus ] = useState('connecting');
   const [ lastAlert, setLastAlert ] = useState(null);
+  const [ connections, setConnections ] = useState(0);
   const [ alertTriggered, setAlertTriggered ] = useState(false);
   const [ alertAcknowledged, setAlertAcknowledged ] = useState(false);
   const [ lastAlertDate, setLastAlertDate ] = useState('Unknown');
 
-  // buttonClickHandler(event) -- Event handler for button click
-  const buttonClickHandler = async () => {
-    // Play sound and trigger state change for animations
-    beep.play();
+  // useEffect for connecting to WebSocket server
+  const ws = useRef(null);
+  useEffect(() => {
+    // Skip if no appToken, already connecting, or already connected
+    if (!appToken || appToken === 'temp-app-token-reconnecting') return;
+    if ([0, 1].includes(ws.current?.readyState)) return;
 
-    if (alertTriggered) {
-      // Don't re-send request if already triggered and hasn't been acknowledged
-      if (!adminPanel && !alertAcknowledged) return;
+    ws.current = new WebSocket(`ws://${window.location.hostname}:4080/`);
 
-      // If admin panel, acknowledge alert
-      if (adminPanel && !alertAcknowledged) {
-        return await acknowledgeAlert();
+    ws.current.addEventListener('open', () => {
+      // Authenticate
+      ws.current.send(JSON.stringify({ type: 'authenticate', appToken: appToken }));
+    });
+
+    // Handle messages from server
+    ws.current.addEventListener('message', (event) => {
+      const message = (() => {
+        try { return(JSON.parse(event.data.toString())); } catch (error) { return; }
+      })();
+      if (!message) return;
+
+      if (message.status?.status) {
+        setApiStatus(message.status.status);
       }
-    }
+      if (message.status?.lastTrigger) {
+        setLastAlert(message.status.lastTrigger);
+      }
+      if (message.status?.connections) {
+        setConnections(message.status.connections);
+      }
 
-    // Send request to API
+      if (message.type === 'result' && message.error) {
+        alert(message.error);
+      }
+
+      console.log('WebSocket Message:', message);
+    });
+
+    // Reconnect on socket closure
+    ws.current.addEventListener('close', () => {
+      console.log('Socket connection closed. Reconnecting...');
+      setApiStatus('connecting');
+      setAppToken('temp-app-token-reconnecting');
+      setTimeout(() => setAppToken(appToken), 0);
+    });
+
+    return () => {
+      ws.current.close();
+    };
+  }, [ appToken ]);
+
+  // apiLogin() -- Function to log in to API server
+  const apiLogin = async () => {
     try {
-      const res = await fetch('/alert', {
+      const res = await fetch('/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Accept': 'application/json',
         },
-        body: `appToken=${appToken}`,
+        body: `password=${password}`,
       });
-      if (res.status === 'error') {
-        // Failed to trigger alert
-        return alert(`Error: ${res.message}`);
+      console.log('res.status', res.status);
+      if (res.status === 401) {
+        return alert('Invalid Password');
       }
-      console.log(await res.json());
+      localStorage.setItem('buttonAppToken', password);
+      setAppToken(password);
     } catch (error) {
-      return alert(`Error: ${error}`);
+      alert(`Error: ${error}`);
+    }
+  };
+
+  // triggerAlert() -- Function to trigger an alert
+  const triggerAlert = async () => {
+    if (ws.current.readyState === 1) {
+      ws.current.send(JSON.stringify({ type: 'command', command: 'alert' }));
+    } else {
+      try {
+        const res = await fetch('/alert', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+          },
+          body: `appToken=${appToken}`,
+        });
+        if (res.status === 'error') {
+          alert('Unable to trigger alert!');
+          return console.error(`Error: ${res.message}`);
+        }
+        console.log('Response:', await res.json());
+      } catch (error) {
+        alert('Unable to trigger alert!');
+        console.error(`Error: ${error}`);
+      }
     }
   };
 
   // acknowledgeAlert() -- Function to allow admins to acknowledge an alert
   const acknowledgeAlert = async () => {
-    try {
-      const res = await fetch('/admin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json',
-        },
-        body: `appToken=${appToken}&command=acknowledge`,
-      });
-      console.log('Response:', res);
-    } catch (error) {
-      console.error(`Error: ${error}`);
+    if (ws.current.readyState === 1) {
+      ws.current.send(JSON.stringify({ type: 'command', command: 'acknowledge' }));
+    } else {
+      try {
+        const res = await fetch('/admin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+          },
+          body: `appToken=${appToken}&command=acknowledge`,
+        });
+        if (res.status === 'error') {
+          alert('Unable to acknowledge alert!');
+          return console.error(`Error: ${res.message}`);
+        }
+        console.log('Response:', await res.json());
+      } catch (error) {
+        alert('Unable to acknowledge alert!');
+        console.error(`Error: ${error}`);
+      }
     }
   };
 
   // Start API status check interval when appToken is set
-  useEffect(() => {
-    // Function to poll API for current alert status
-    const getAlertStatus = async () => {
-      const response = await fetch('/status', { method: 'GET' });
-      const data = await response.json();
-      if (data.status) {
-        setApiStatus(data.status);
-      }
-      if (data.lastTrigger) {
-        setLastAlert(data.lastTrigger);
-      }
-    }
+  // **TODO: enable this if WS can't connect
+  // useEffect(() => {
+  //   // Function to poll API for current alert status
+  //   const getAlertStatus = async () => {
+  //     const response = await fetch('/status', { method: 'GET' });
+  //     const data = await response.json();
+  //     if (data.status) {
+  //       setApiStatus(data.status);
+  //     }
+  //     if (data.lastTrigger) {
+  //       setLastAlert(data.lastTrigger);
+  //     }
+  //   }
 
-    // Check alert status every second
-    const alertStatusInterval = setInterval(() => {
-      getAlertStatus();
-    }, 1000);
+  //   // Check alert status every second
+  //   const alertStatusInterval = setInterval(() => {
+  //     getAlertStatus();
+  //   }, 1000);
 
-    // Clear interval when unmounted
-    return () => clearInterval(alertStatusInterval);
-  }, [appToken]);
-
+  //   // Clear interval when unmounted
+  //   return () => clearInterval(alertStatusInterval);
+  // }, [appToken]);
 
   // Update button state when API status has changed
   useEffect(() => {
@@ -139,24 +213,26 @@ const Button = (props) => {
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
-    try {
-      const res = await fetch('/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept': 'application/json',
-        },
-        body: `password=${password}`,
-      });
-      console.log('res.status', res.status);
-      if (res.status === 401) {
-        return alert('Invalid Password');
+    apiLogin();
+  };
+
+  // buttonClickHandler(event) -- Event handler for button click
+  const buttonClickHandler = async () => {
+    // Play sound and trigger state change for animations
+    beep.play();
+
+    if (alertTriggered) {
+      // Don't re-send request if already triggered and hasn't been acknowledged
+      if (!adminPanel && !alertAcknowledged) return;
+
+      // If admin panel, acknowledge alert
+      if (adminPanel && !alertAcknowledged) {
+        return acknowledgeAlert();
       }
-      localStorage.setItem('buttonAppToken', password);
-      setAppToken(password);
-    } catch (error) {
-      alert(`Error: ${error}`);
     }
+
+    // Send request to API
+    triggerAlert();
   };
 
   // Return UI
@@ -169,17 +245,23 @@ const Button = (props) => {
             <input id="password" value={password} onChange={handlePasswordChange} />
           </form>
         </div>
-      ) : (
-        <header className="Button-header">
-          <span className={ alertTriggered ? alertAcknowledged ? 'pulse pgreen' : 'pulse pred' : 'pulse' }>
-            <i className={ alertTriggered ? alertAcknowledged ? 'btn green' : 'btn red' : 'btn' } onClick={ buttonClickHandler }>
-              <i className={ alertAcknowledged ? 'fa fa-thumbs-up' : 'fa fa-bell' }></i>
-            </i>
-          </span>
-          { !adminPanel ? null
-            : <span className='lastAlertText'><b>Last Alert</b><br />{ lastAlert ? lastAlertDate : 'None' }</span>
-          }
-        </header>
+      ) : apiStatus === 'connecting'
+          ? (
+            <div className="connectingView">Connecting...</div>
+          ) : (
+            <header className="Button-header">
+              <span className={ alertTriggered ? alertAcknowledged ? 'pulse pgreen' : 'pulse pred' : 'pulse' }>
+                <i className={ alertTriggered ? alertAcknowledged ? 'btn green' : 'btn red' : 'btn' } onClick={ buttonClickHandler }>
+                  <i className={ alertAcknowledged ? 'fa fa-thumbs-up' : 'fa fa-bell' }></i>
+                </i>
+              </span>
+              { !adminPanel ? null
+                : <span className='lastAlertText'><b>Last Alert</b><br />{ lastAlert ? lastAlertDate : 'None' }</span>
+              }
+              { !adminPanel ? null
+                : <span className='connectionsText'><b>Connections: </b>{ connections ? connections : 0 }</span>
+              }
+            </header>
       )}
     </div>
   );

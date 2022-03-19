@@ -49,7 +49,7 @@ app.use('/', baseRoutes);
 // Express error handling
 app.use((err) => {
   if (err) {
-    console.error(`${chalk.red('[Error]')} Express error encountered:\n${JSON.stringify(err, null, 2)}`);
+    console.error(`${chalk.red('[Error]')} Express error encountered:\n${err}`);
   }
 });
 

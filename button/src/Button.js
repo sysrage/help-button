@@ -54,14 +54,17 @@ const Button = (props) => {
       })();
       if (!message) return;
 
-      if (message.status?.status) {
-        setApiStatus(message.status.status);
-      }
-      if (message.status?.lastTrigger) {
-        setLastAlert(message.status.lastTrigger);
-      }
-      if (message.status?.connections) {
-        setConnections(message.status.connections);
+      if (message.type === 'status') {
+        if (message.status?.status) {
+          setApiStatus(message.status.status);
+        }
+        if (message.status?.lastTrigger) {
+          setLastAlert(message.status.lastTrigger);
+        }
+        if (message.status?.connections) {
+          setConnections(message.status.connections);
+        }
+        return console.log('Button Status:', message.status);
       }
 
       if (message.type === 'result' && message.error) {

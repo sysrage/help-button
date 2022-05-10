@@ -33,9 +33,31 @@ const Button = (props) => {
   const [ alertAcknowledged, setAlertAcknowledged ] = useState(false);
   const [ lastAlertDate, setLastAlertDate ] = useState('Unknown');
 
+  // useEffect for WebSocket connection test interval
+  const wsCheckInterval = useRef(null);
+  useEffect(() => {
+    if (wsCheckInterval.current) return;
+
+    wsCheckInterval.current = setInterval(() => {
+      console.log(`Connection Status: ${ws.current?.readyState}`);
+      if (![0, 1].includes(ws.current?.readyState)) {
+        console.log('Socket not connected. Reconnecting...');
+        setApiStatus('connecting');
+        setAppToken('temp-app-token-reconnecting');
+        setTimeout(() => setAppToken(appToken), 0);
+      }
+    }, 10000);
+  }, [ appToken ]);
+
+  // useEffect for component unmounting
+  useEffect(() => {
+    return () => {
+      if (wsCheckInterval.current) clearInterval(wsCheckInterval.current);
+    };
+  }, []);
+
   // useEffect for connecting to WebSocket server
   const ws = useRef(null);
-  const wsCheckInterval = useRef(null);
   useEffect(() => {
     // Skip if no appToken, already connecting, or already connected
     if (!appToken || appToken === 'temp-app-token-reconnecting') return;
@@ -83,22 +105,8 @@ const Button = (props) => {
       setTimeout(() => setAppToken(appToken), 0);
     });
 
-    // Start connection test interval
-    if (!wsCheckInterval.current) {
-      wsCheckInterval.current = setInterval(() => {
-        console.log(`Connection Status: ${ws.current?.readyState}`);
-        if (![0, 1].includes(ws.current?.readyState)) {
-          console.log('Socket not connected. Reconnecting...');
-          setApiStatus('connecting');
-          setAppToken('temp-app-token-reconnecting');
-          setTimeout(() => setAppToken(appToken), 0);
-        }
-      }, 10000);
-    }
-
     return () => {
       ws.current.close();
-      if (wsCheckInterval.current) clearInterval(wsCheckInterval.current);
     };
   }, [ appToken ]);
 

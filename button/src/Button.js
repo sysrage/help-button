@@ -34,25 +34,34 @@ const Button = (props) => {
   const [ lastAlertDate, setLastAlertDate ] = useState('Unknown');
 
   // useEffect for WebSocket connection test interval
-  const wsCheckInterval = useRef(null);
+  const connectionCheckTimeout = useRef(null);
+  const lastStatusTime = useRef(null);
   useEffect(() => {
-    if (wsCheckInterval.current) return;
+    if (appToken === 'temp-app-token-reconnecting') return;
+    if (apiStatus === 'connecting') return;
 
-    wsCheckInterval.current = setInterval(() => {
-      console.log(`Connection Status: ${ws.current?.readyState}`);
-      if (![0, 1].includes(ws.current?.readyState)) {
-        console.log('Socket not connected. Reconnecting...');
-        setApiStatus('connecting');
-        setAppToken('temp-app-token-reconnecting');
-        setTimeout(() => setAppToken(appToken), 0);
+    const checkConnection = () => {
+      if (connectionCheckTimeout.current) clearTimeout(connectionCheckTimeout.current);
+      if (lastStatusTime.current) {
+        const currentTime = (new Date()).getTime() / 1000;
+        const timeDiff = (currentTime - lastStatusTime.current).toFixed(3);
+        console.log(`Last Status: ${timeDiff} seconds ago`);
+        if (timeDiff > 5) {
+          console.log('No status update in over 5 seconds. Reconnecting...');
+          setApiStatus('connecting');
+          setAppToken('temp-app-token-reconnecting');
+          setTimeout(() => setAppToken(appToken), 0);
+        }
       }
-    }, 10000);
-  }, [ appToken ]);
+      connectionCheckTimeout.current = setTimeout(checkConnection, 5000);
+    };
+    checkConnection();
+  }, [ appToken, apiStatus ]);
 
   // useEffect for component unmounting
   useEffect(() => {
     return () => {
-      if (wsCheckInterval.current) clearInterval(wsCheckInterval.current);
+      if (connectionCheckTimeout.current) clearTimeout(connectionCheckTimeout.current);
     };
   }, []);
 
@@ -87,6 +96,7 @@ const Button = (props) => {
         if (message.status?.connections) {
           setConnections(message.status.connections);
         }
+        lastStatusTime.current = (new Date()).getTime() / 1000;
         return console.log('Button Status:', message.status);
       }
 

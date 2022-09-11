@@ -33,9 +33,11 @@ const Button = (props) => {
   const [ alertAcknowledged, setAlertAcknowledged ] = useState(false);
   const [ lastAlertDate, setLastAlertDate ] = useState('Unknown');
 
-  // useEffect for WebSocket connection test interval
   const connectionCheckTimeout = useRef(null);
   const lastStatusTime = useRef(null);
+  const ws = useRef(null);
+
+  // useEffect for WebSocket connection test interval
   useEffect(() => {
     if (appToken === 'temp-app-token-reconnecting') return;
     if (apiStatus === 'connecting') return;
@@ -66,7 +68,6 @@ const Button = (props) => {
   }, []);
 
   // useEffect for connecting to WebSocket server
-  const ws = useRef(null);
   useEffect(() => {
     // Skip if no appToken, already connecting, or already connected
     if (!appToken || appToken === 'temp-app-token-reconnecting') return;
@@ -116,7 +117,8 @@ const Button = (props) => {
     });
 
     return () => {
-      ws.current.close();
+      // This is causing iOS Safari to fail at re-connecting after sleep
+      // ws.current.close();
     };
   }, [ appToken ]);
 

@@ -1,7 +1,8 @@
 'use strict';
 
 // ## Help Button -- Web / API Server
-const path = require('path');
+const path = require('node:path');
+const http = require('node:http');
 const chalk = require('chalk');
 const express = require('express');
 const stoppable = require('stoppable');
@@ -41,6 +42,13 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
+const httpServer = http.createServer(app);
+const server = stoppable(httpServer.listen(config.port, () => {
+  console.log(`${chalk.green('[Info]')} Server listening on port: ${config.port}`);
+}));
+
+global.httpServer = httpServer;
+
 // Add unsecure base routes
 const baseRoutes = require('./routes/base');
 
@@ -53,10 +61,6 @@ app.use((err) => {
     console.error(err);
   }
 });
-
-const server = stoppable(app.listen(config.port, () => {
-  console.log(`${chalk.green('[Info]')} Server listening on port: ${config.port}`);
-}));
 
 // # Function to gracefully shutdown
 const shutDown = () => {

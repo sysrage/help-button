@@ -94,7 +94,7 @@ const triggerAlert = () => {
 
 /* WebSocket Setup */
 const wsConnections = [];
-const wss = new WebSocketServer({ port: config.wsPort });
+const wss = new WebSocketServer({ server: global.httpServer });
 
 wss.on('connection', (ws) => {
   const id = randomUUID();

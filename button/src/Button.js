@@ -73,7 +73,7 @@ const Button = (props) => {
     if (!appToken || appToken === 'temp-app-token-reconnecting') return;
     if ([0, 1].includes(ws.current?.readyState)) return;
 
-    ws.current = new WebSocket(`ws://${window.location.hostname}:4080/`);
+    ws.current = new WebSocket(`ws://${window.location.host}/`);
 
     ws.current.addEventListener('open', () => {
       // Authenticate

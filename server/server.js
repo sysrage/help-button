@@ -55,10 +55,12 @@ const baseRoutes = require('./routes/base');
 app.use('/', baseRoutes);
 
 // Express error handling
-app.use((err) => {
+app.use((err, req, res) => {
   if (err) {
     console.error(`${chalk.red('[Error]')} Express error encountered:`);
-    console.error(err);
+    console.error(String(err));
+    res.status(500);
+    res.render('error', { error: err });
   }
 });
 

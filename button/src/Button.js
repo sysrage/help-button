@@ -73,7 +73,10 @@ const Button = (props) => {
     if (!appToken || appToken === 'temp-app-token-reconnecting') return;
     if ([0, 1].includes(ws.current?.readyState)) return;
 
-    ws.current = new WebSocket(`${window.location.protocol.replace('http', 'ws')}//${window.location.host}/`);
+    const wsUri = process.env.NODE_ENV === 'production'
+      ? `${window.location.protocol.replace('http', 'ws')}//${window.location.host}/`
+      : `${window.location.protocol.replace('http', 'ws')}//${window.location.hostname}:4000/`
+    ws.current = new WebSocket(wsUri);
 
     ws.current.addEventListener('open', () => {
       // Authenticate

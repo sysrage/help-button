@@ -108,6 +108,11 @@ wss.on('connection', (ws) => {
     }
   }, 20000);
 
+  // Error handler
+  ws.on('error', (error) => {
+    console.error(error);
+  });
+
   // Listen for messages
   ws.on('message', (data) => {
     // Validate proper message was sent

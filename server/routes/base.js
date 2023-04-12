@@ -178,8 +178,11 @@ wss.on('connection', (ws) => {
   }, 20000);
 
   // Error handler
+  // ws._socket.prependListener('data', (data) => console.log('ws data', data.toString()));
   ws.on('error', (error) => {
-    console.error(error);
+    // Ignore invalid data frame from iOS Safari
+    if (error.message === 'Invalid WebSocket frame: RSV2 and RSV3 must be clear') return;
+    console.log(`${chalk.yellow('[Warning]')} Unexpected WebSocket error:`, error);
   });
 
   // Listen for messages
@@ -208,6 +211,7 @@ wss.on('connection', (ws) => {
       if (message.type === 'authenticate' && message.appToken === config.alertAppToken) {
         wsAuthenticated = true;
         // Add connection to connection list for tracking
+        // console.log(`Adding WebSocket Connection: ${id}`);
         wsConnections.push({ id, ws });
         ws.send(JSON.stringify({ type: 'authenticate', status: 'success' }));
 
@@ -222,9 +226,9 @@ wss.on('connection', (ws) => {
 
     // Handle push notification registration messages
     if (message.type === 'register') {
-      // TODO: clean up this verification
+      // Verify valid subscription details were provided
       if (
-        !['endpoint', 'expirationTime', 'keys'].every((key) => Object.hasOwn(message.subscription, key)) ||
+        !['endpoint', 'keys'].every((key) => Object.hasOwn(message.subscription, key)) ||
         !['p256dh', 'auth'].every((key) => Object.hasOwn(message.subscription.keys, key))
       ) {
         ws.send(JSON.stringify({ type: 'result', error: 'Invalid registration.' }));
@@ -288,7 +292,11 @@ wss.on('connection', (ws) => {
 
   // Remove connection from connection list when closed
   ws.on('close', () => {
-    wsConnections.splice(wsConnections.findIndex((c) => c.id === id), 1);
+    const wsIndex = wsConnections.findIndex((c) => c.id === id);
+    if (wsIndex > -1) {
+      // console.log(`Removing WebSocket Connection: ${id}`);
+      wsConnections.splice(wsIndex, 1);
+    }
   });
 });
 // Send current button status every X seconds to all active WS connections

@@ -75,7 +75,8 @@ self.addEventListener('install', () => {
 });
 
 // Refresh all client windows when new service worker is installed
-self.addEventListener('activate', async () => {
+self.addEventListener('activate', async (event) => {
+  event.waitUntil(self.clients.claim());
   const tabs = await self.clients.matchAll({type: 'window'});
   for (const tab of tabs) {
     tab.navigate(tab.url);
@@ -83,3 +84,30 @@ self.addEventListener('activate', async () => {
 });
 
 // Any other custom service worker logic can go here.
+let getVersionPort;
+let count = 0;
+self.addEventListener("message", async (event) => {
+  if (event.data && event.data.type === 'INIT_PORT') {
+    getVersionPort = event.ports[0];
+  }
+
+  // Load counter
+  if (event.data && event.data.type === 'INCREASE_COUNT') {
+    getVersionPort.postMessage({ payload: ++count });
+  }
+
+  // Push Notifications
+  if (event.data && event.data.type === 'ENABLE_PUSH') {
+    self.registration.showNotification('Help Button Notification', {
+      body: 'Push notifications have been enabled for the Help Button.',
+      icon: '/logo512.png',
+    });
+  }
+
+});
+
+self.addEventListener("push", (event) => {
+  const { title, options } = event.data.json();
+  console.log(`New Push event -- Title: ${title} | Options: ${JSON.stringify(options)}`);
+  self.registration.showNotification(title, options);
+});

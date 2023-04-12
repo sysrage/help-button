@@ -32,10 +32,12 @@ const Button = (props) => {
   const [ alertTriggered, setAlertTriggered ] = useState(false);
   const [ alertAcknowledged, setAlertAcknowledged ] = useState(false);
   const [ lastAlertDate, setLastAlertDate ] = useState('Unknown');
+  const [ pushEnabled, setPushEnabled ] = useState(window.Notification ? Notification.permission : 'unavailable');
 
   const connectionCheckTimeout = useRef(null);
   const lastStatusTime = useRef(null);
   const ws = useRef(null);
+  const messageChannel = useRef(null);
 
   // useEffect for WebSocket connection test interval
   useEffect(() => {
@@ -125,6 +127,22 @@ const Button = (props) => {
     };
   }, [ appToken ]);
 
+  // Open MessageChannel to service worker
+  useEffect(() => {
+    messageChannel.current = new MessageChannel();
+    navigator.serviceWorker.controller.postMessage({
+      type: 'INIT_PORT'
+    }, [messageChannel.current.port2]);
+
+    messageChannel.current.port1.onmessage = (event) => {
+      console.log('event', event.data.payload);
+    };
+
+    navigator.serviceWorker.controller.postMessage({
+      type: 'INCREASE_COUNT',
+    });
+  }, []);
+
   // apiLogin() -- Function to log in to API server
   const apiLogin = async () => {
     try {
@@ -199,6 +217,32 @@ const Button = (props) => {
     }
   };
 
+  // pushRegistration() -- Function to allow admins to register for push notifications
+  const pushRegistration = async (subscription) => {
+    if (ws.current.readyState === 1) {
+      ws.current.send(JSON.stringify({ type: 'register', subscription }));
+    } else {
+      try {
+        const res = await fetch('/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+          },
+          body: { appToken, subscription },
+        });
+        if (res.status === 'error') {
+          alert('Unable to subscribe through API server!');
+          return console.error(`Error: ${res.message}`);
+        }
+        console.log('Response:', await res.json());
+      } catch (error) {
+        alert('Unable to subscribe through API server!');
+        console.error(`Error: ${error}`);
+      }
+    }
+  };
+
   // Start API status check interval when appToken is set
   // **TODO: enable this if WS can't connect
   // useEffect(() => {
@@ -257,8 +301,8 @@ const Button = (props) => {
     apiLogin();
   };
 
-  // buttonClickHandler(event) -- Event handler for button click
-  const buttonClickHandler = async () => {
+  // handleButtonClick(event) -- Event handler for button click
+  const handleButtonClick = async () => {
     // Play sound and trigger state change for animations
     beep.play();
 
@@ -276,6 +320,50 @@ const Button = (props) => {
     triggerAlert();
   };
 
+  // Convert a base64 string to Uint8Array.
+  // Must do this so the server can understand the VAPID_PUBLIC_KEY.
+  function urlB64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  // handlePushEnable(event) -- Event handler for enabling push notifications "button"
+  const handlePushEnable = async () => {
+    // Request user permission for notifications
+    const userChoice = await window.Notification.requestPermission();
+    if (userChoice === 'granted') {
+      // Subscribe to push manager
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscribed = await registration.pushManager.getSubscription();
+      if (subscribed) {
+        console.info('User is already subscribed to push notifications.');
+        return;
+      }
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(process.env.REACT_APP_VAPID)
+      });
+
+      // Send subscription information to API server
+      try {
+        await pushRegistration(subscription);
+      } catch (error) {
+        console.error('Unable to add push subscription to API', error);
+      }
+
+      navigator.serviceWorker.controller.postMessage({
+        type: 'ENABLE_PUSH',
+      });
+    }
+    setPushEnabled(userChoice);
+  };
+
   // Return UI
   return (
     <div className="Button">
@@ -290,19 +378,25 @@ const Button = (props) => {
           ? (
             <div className="connectingView">Connecting...</div>
           ) : (
-            <header className="Button-header">
-              <span className={ alertTriggered ? alertAcknowledged ? 'pulse pgreen' : 'pulse pred' : 'pulse' }>
-                <i className={ alertTriggered ? alertAcknowledged ? 'btn green' : 'btn red' : 'btn' } onClick={ buttonClickHandler }>
-                  <i className={ alertAcknowledged ? 'fa fa-thumbs-up' : 'fa fa-bell' }></i>
-                </i>
-              </span>
-              { !adminPanel ? null
-                : <span className='lastAlertText'><b>Last Alert</b><br />{ lastAlert ? lastAlertDate : 'None' }</span>
+            <>
+              {
+                adminPanel && !['granted', 'unavailable', 'denied'].includes(pushEnabled) &&
+                <span id="pushEnableButton" onClick={handlePushEnable}>Enable Push Notifications</span>
               }
-              { !adminPanel ? null
-                : <span className='connectionsText'><b>Connections: </b>{ connections ? connections : 0 }</span>
-              }
-            </header>
+              <header className="Button-header">
+                <span className={ alertTriggered ? alertAcknowledged ? 'pulse pgreen' : 'pulse pred' : 'pulse' }>
+                  <i className={ alertTriggered ? alertAcknowledged ? 'btn green' : 'btn red' : 'btn' } onClick={handleButtonClick}>
+                    <i className={ alertAcknowledged ? 'fa fa-thumbs-up' : 'fa fa-bell' }></i>
+                  </i>
+                </span>
+                { !adminPanel ? null
+                  : <span className='lastAlertText'><b>Last Alert</b><br />{ lastAlert ? lastAlertDate : 'None' }</span>
+                }
+                { !adminPanel ? null
+                  : <span className='connectionsText'><b>Connections: </b>{ connections ? connections : 0 }</span>
+                }
+              </header>
+            </>
       )}
     </div>
   );

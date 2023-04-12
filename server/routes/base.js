@@ -1,12 +1,14 @@
 'use strict';
 
-const path = require('path');
+const { randomUUID } = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const chalk = require('chalk');
 const express = require('express');
 const Push = require('pushover-notifications');
-const { randomUUID } = require('crypto');
 const { WebSocketServer } = require('ws');
+const webpush = require('web-push');
 
 // eslint-disable-next-line
 const router = express.Router();
@@ -22,8 +24,8 @@ const alertState = {
   lastTrigger: null,
 };
 
-const sendPush = () => {
-  // Send Pushover notifications
+const sendAllPushover = () => {
+  // Send Pushover notifications to all targets
   const push = new Push({
     token: config.pushoverAppToken,
   });
@@ -45,6 +47,71 @@ const sendPush = () => {
       }
     });
   }
+};
+
+// TODO: read/write webPushSubscriptions to disk
+const vapidDetails = {
+  publicKey: process.env.VAPID_PUBLIC_KEY,
+  privateKey: process.env.VAPID_PRIVATE_KEY,
+  subject: process.env.VAPID_SUBJECT,
+};
+const loadWebPushSubscriptions = () => {
+  try {
+    const data = fs.readFileSync(path.resolve(__dirname, 'web-push-subscriptions.json'), 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.log(`${chalk.yellow('[Warning]')} Unable to read web-push-subscriptions.json:`, error);
+    return [];
+  }
+};
+const webPushSubscriptions = loadWebPushSubscriptions();
+let writingWebPushSubscriptions = false;
+const addWebPushSubscription = (subscription) => {
+  if (writingWebPushSubscriptions) {
+    setTimeout(() => addWebPushSubscription(subscription), 200);
+    return;
+  }
+  webPushSubscriptions.push(subscription);
+  writingWebPushSubscriptions = true;
+  try {
+    fs.writeFileSync(path.resolve(__dirname, 'web-push-subscriptions.json'), JSON.stringify(webPushSubscriptions));
+  } catch (error) {
+    console.log(`${chalk.red('[Error]')} Unable to write web-push-subscriptions.json:`, error);
+  }
+  writingWebPushSubscriptions = false;
+};
+const sendAllWebPush = async () => {
+  // Send Web Push notifications to all targets
+
+  // Create the notification content.
+  const notification = JSON.stringify({
+    title: 'Help Needed!',
+    options: {
+      body: 'The help button has been pressed.',
+      icon: '/logo512.png',
+    },
+  });
+
+  // Customize how the push service should attempt to deliver the push message.
+  // And provide authentication information.
+  const options = {
+    TTL: 10000,
+    vapidDetails
+  };
+
+  // Send a push message to each client specified in the subscriptions array.
+  for (const subscription of webPushSubscriptions) {
+    const { endpoint } = subscription;
+    const id = endpoint.substr((endpoint.length - 8), endpoint.length);
+    try {
+      const result = await webpush.sendNotification(subscription, notification, options);
+      if (result.statusCode !== 201) {
+        console.log(`${chalk.yellow('[Warning]')} Unexpected status code sending Web Push notification (${result.statusCode}):`, result);
+      }
+    } catch (error) {
+      console.log(`${chalk.red('[Error]')} Error sending Web Push:`, error);
+    }
+  };
 };
 
 const clearAlert = () => {
@@ -72,7 +139,8 @@ const ackAlert = () => {
 const triggerAlert = () => {
   alertState.status = 'triggered';
   alertState.lastTrigger = new Date();
-  sendPush();
+  sendAllPushover();
+  sendAllWebPush();
 
   // Clear any existing timeouts
   if (resetTimeout) clearTimeout(resetTimeout);
@@ -81,7 +149,8 @@ const triggerAlert = () => {
 
   // Re-send Pushover notice every 10 seconds
   pushInterval = setInterval(() => {
-    sendPush();
+    sendAllPushover();
+    sendAllWebPush();
   }, 10 * 1000);
 
   // Reset alert state if not acknowledged in 60 minutes
@@ -147,6 +216,27 @@ wss.on('connection', (ws) => {
       console.log(`${chalk.yellow('[Warning]')} Unauthorized WebSocket request: ${data.toString()}`);
       ws.send('Unauthorized');
       ws.close();
+
+      return;
+    }
+
+    // Handle push notification registration messages
+    if (message.type === 'register') {
+      // TODO: clean up this verification
+      if (
+        !['endpoint', 'expirationTime', 'keys'].every((key) => Object.hasOwn(message.subscription, key)) ||
+        !['p256dh', 'auth'].every((key) => Object.hasOwn(message.subscription.keys, key))
+      ) {
+        ws.send(JSON.stringify({ type: 'result', error: 'Invalid registration.' }));
+
+        return;
+      }
+
+      // Save subscription information
+      addWebPushSubscription(message.subscription);
+      ws.send(JSON.stringify({ type: 'result', status: 'success', message: 'Web Push client has been registered.' }));
+
+      console.log(`${chalk.green('[Info]')} New Web Push subscription added...`);
 
       return;
     }
@@ -227,6 +317,27 @@ router.post('/login', (req, res) => {
   }
 
   return res.send({ message: 'Success', status: 'success' });
+});
+
+// # Add register endpoint for push notifications
+router.post('/register', (req, res) => {
+  // Reject request if app token doesn't match
+  if (req.body.appToken !== config.alertAppToken) {
+    res.status(401);
+
+    return res.send({
+      message: 'Invalid Application Token!',
+      status: 'error',
+    });
+  }
+
+  console.log(`${chalk.green('[Info]')} New push subscription: ${JSON.stringify(req.body.subscription)}`);
+  addWebPushSubscription(req.body.subscription);
+
+  return res.send({
+    message: 'Successfully registered for push notifications!',
+    status: 'success',
+  });
 });
 
 // # Add alert endpoint

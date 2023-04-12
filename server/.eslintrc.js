@@ -1,9 +1,12 @@
 'use strict';
 
 module.exports = {
-  extends: [
-    '@phoenix35/eslint-config/node',
-  ],
+  parserOptions: {
+    'ecmaVersion': 'latest'
+  },
+  env: {
+    es6: true
+  },
   rules: {
     quotes: [
       'error',

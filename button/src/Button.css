@@ -166,3 +166,11 @@
       box-shadow: 0 0 0 0 rgba(201, 8, 2, 0);
   }
 }
+
+
+#pushEnableButton {
+  font-size: 1.4em;
+  color: #2610a1;
+  text-decoration: underline;
+  cursor: pointer;
+}

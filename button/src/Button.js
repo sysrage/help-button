@@ -365,6 +365,12 @@ const Button = (props) => {
     setPushEnabled(userChoice);
   };
 
+  const handleTestButton = () => {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SERVICE_WORKER_TEST',
+    });
+  };
+
   // Return UI
   return (
     <div className="Button">
@@ -383,6 +389,10 @@ const Button = (props) => {
               {
                 adminPanel && !['granted', 'unavailable', 'denied'].includes(pushEnabled) &&
                 <span id="pushEnableButton" onClick={handlePushEnable}>Enable Push Notifications</span>
+              }
+              {
+                adminPanel && pushEnabled === 'granted' &&
+                <span id="workerTestButton" onClick={handleTestButton}>Service Worker Test</span>
               }
               <header className="Button-header">
                 <span className={ alertTriggered ? alertAcknowledged ? 'pulse pgreen' : 'pulse pred' : 'pulse' }>

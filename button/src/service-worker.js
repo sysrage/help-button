@@ -96,6 +96,13 @@ self.addEventListener("message", async (event) => {
     getVersionPort.postMessage({ payload: ++count });
   }
 
+  if (event.data && event.data.type === 'SERVICE_WORKER_TEST') {
+    self.registration.showNotification('Help Button Notification', {
+      body: 'Test notification.',
+      icon: '/logo512.png',
+    });
+  }
+
   // Push Notifications
   if (event.data && event.data.type === 'ENABLE_PUSH') {
     self.registration.showNotification('Help Button Notification', {
@@ -110,4 +117,8 @@ self.addEventListener("push", (event) => {
   const { title, options } = event.data.json();
   console.log(`New Push event -- Title: ${title} | Options: ${JSON.stringify(options)}`);
   self.registration.showNotification(title, options);
+});
+
+self.addEventListener('notificationclick', (event) => {
+  console.log('event.notification', event.notification);
 });

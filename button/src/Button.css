@@ -168,7 +168,7 @@
 }
 
 
-#pushEnableButton {
+#pushEnableButton, #workerTestButton {
   font-size: 1.4em;
   color: #2610a1;
   text-decoration: underline;

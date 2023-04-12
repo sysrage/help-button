@@ -129,7 +129,7 @@ const Button = (props) => {
 
   // Open MessageChannel to service worker
   useEffect(() => {
-    if (!navigator.serviceWorker) return;
+    if (!navigator.serviceWorker?.controller) return;
     messageChannel.current = new MessageChannel();
     navigator.serviceWorker.controller.postMessage({
       type: 'INIT_PORT'

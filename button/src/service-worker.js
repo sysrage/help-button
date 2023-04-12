@@ -70,14 +70,14 @@ self.addEventListener('message', (event) => {
 });
 
 // Automatically update to new service worker when available
-self.addEventListener('install', () => {
-  self.skipWaiting();
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
 });
 
 // Refresh all client windows when new service worker is installed
 self.addEventListener('activate', async (event) => {
   event.waitUntil(self.clients.claim());
-  const tabs = await self.clients.matchAll({type: 'window'});
+  const tabs = await self.clients.matchAll({ type: 'window' });
   for (const tab of tabs) {
     tab.navigate(tab.url);
   }

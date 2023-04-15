@@ -122,6 +122,7 @@ self.addEventListener("push", (event) => {
 self.addEventListener('notificationclick', (event) => {
   // console.log('event.notification', event.notification);
   console.log('self.origin', self.origin);
+  console.log('self.location', self.location);
   console.log('self keys', Object.keys(self))
   console.log('event keys', Object.keys(event));
 });

@@ -97,10 +97,8 @@ self.addEventListener("message", async (event) => {
   }
 
   if (event.data && event.data.type === 'SERVICE_WORKER_TEST') {
-    console.log('self.origin', self.origin);
-    console.log('keys', Object.keys(self))
     self.registration.showNotification('Help Button Notification', {
-      body: 'Test notification: ' + event.message.url,
+      body: 'Test notification: ' + self.origin,
       icon: '/logo512.png',
     });
   }
@@ -122,5 +120,8 @@ self.addEventListener("push", (event) => {
 });
 
 self.addEventListener('notificationclick', (event) => {
-  console.log('event.notification', event.notification);
+  // console.log('event.notification', event.notification);
+  console.log('self.origin', self.origin);
+  console.log('self keys', Object.keys(self))
+  console.log('event keys', Object.keys(event));
 });

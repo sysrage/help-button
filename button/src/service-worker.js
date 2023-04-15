@@ -97,8 +97,10 @@ self.addEventListener("message", async (event) => {
   }
 
   if (event.data && event.data.type === 'SERVICE_WORKER_TEST') {
+    console.log('self.origin', self.origin);
+    console.log('keys', Object.keys(self))
     self.registration.showNotification('Help Button Notification', {
-      body: 'Test notification.',
+      body: 'Test notification: ' + event.message.url,
       icon: '/logo512.png',
     });
   }
